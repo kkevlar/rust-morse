@@ -1,17 +1,5 @@
 #![no_std]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_string_to_code() {
-        use Morse::*;
-        let v: Vec<Morse, U8> = Vec::from_slice(&[Dot]).unwrap();
-        assert_eq!(string_to_code(&"0"), v);
-    }
-}
-
 extern crate heapless;
 
 use heapless::consts::*;
@@ -94,6 +82,80 @@ fn calc_error(
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_calc_error_spoton() {
+        assert_eq!(
+            0,
+            calc_error(
+                &TimedLightEvent {
+                    light_state: LightState::Dark,
+                    duration: 600,
+                },
+                &MorseCandidate {
+                    light_state: LightState::Dark,
+                    units: 3,
+                },
+                200
+            )
+            .unwrap()
+        );
+    }
+
+    #[test]
+    fn test_calc_error_confused() {
+        assert_eq!(
+            200,
+            calc_error(
+                &TimedLightEvent {
+                    light_state: LightState::Light,
+                    duration: 300,
+                },
+                &MorseCandidate {
+                    light_state: LightState::Light,
+                    units: 1,
+                },
+                100
+            )
+            .unwrap()
+        );
+    }
+
+    fn best_error_helper(light_state: LightState, duration: i64, units: i64) -> i64 {
+        best_error(
+            &TimedLightEvent {
+                light_state,
+                duration,
+            },
+            units,
+        )
+        .unwrap()
+        .score
+    }
+
+    #[test]
+    fn test_best_error() {
+        use super::LightState::*;
+
+        assert_eq!(100, best_error_helper(Dark, 200, 100));
+        assert_eq!(80, best_error_helper(Dark, 180, 100));
+        assert_eq!(50, best_error_helper(Dark, 50, 100));
+        assert_eq!(100, best_error_helper(Dark, 0, 100));
+        assert_eq!(1, best_error_helper(Dark, 701, 100));
+        assert_eq!(1, best_error_helper(Dark, 6, 1));
+
+        assert_eq!(200, best_error_helper(Light, 800, 200));
+        assert_eq!(400, best_error_helper(Light, 700, 100));
+        assert_eq!(1000, best_error_helper(Light, 0, 1000));
+        assert_eq!(100, best_error_helper(Light, 200, 100));
+        assert_eq!(2, best_error_helper(Light, 1502, 500));
+        assert_eq!(0, best_error_helper(Light, 75, 25));
+    }
+}
+
 fn make_score(
     event: &TimedLightEvent,
     mc: &'static MorseCandidate,
@@ -103,6 +165,13 @@ fn make_score(
         item: mc,
         score: calc_error(event, mc, unit_millis)?,
     })
+}
+
+fn rolling_min<T>(min_so_far: Option<T>, next: T, f: fn(&T) -> i64) -> Option<T> {
+    match min_so_far {
+        Some(m) if f(&m) < f(&next) => Some(m),
+        _ => Some(next),
+    }
 }
 
 fn best_error(event: &TimedLightEvent, unit_millis: i64) -> Result<Scored<&MorseCandidate>, ()> {
@@ -119,18 +188,14 @@ fn best_error(event: &TimedLightEvent, unit_millis: i64) -> Result<Scored<&Morse
         // Unwraps each optional score, leaving only scores which weren't failures
         .filter_map(|opt| opt)
         // Starts with none, but folds and returns the highest scoring Scored struct
-        .fold(
-            None,
-            |min_so_far: Option<Scored<&MorseCandidate>>, scored| match min_so_far {
-                Some(m) if m.score < scored.score => Some(m),
-                _ => Some(scored),
-            },
-        )
+        .fold(None, |i, j| {
+            rolling_min(i, j, |x: &Scored<&MorseCandidate>| x.score)
+        })
         // Returns the Err variant if the Scored struct was not present
         .ok_or(())
 }
 
-fn unnamed(timings: &Vec<TimedLightEvent, U2048>) {
+fn estimate_unit_time(timings: &[TimedLightEvent]) -> i64 {
     // Iterate over possible unit times from 1 to 5000 ms
     let bestunitmillis: i64 = (1..5000)
         // For each time, score it by summing the scores of the best candidate for each event
@@ -144,16 +209,12 @@ fn unnamed(timings: &Vec<TimedLightEvent, U2048>) {
             }
         })
         // Converge on the minimum scoring unit time
-        .fold(
-            None,
-            |min_so_far: Option<Scored<i64>>, score| match min_so_far {
-                Some(m) if m.score < score.score => Some(m),
-                _ => Some(score),
-            },
-        )
+        .fold(None, |i, j| rolling_min(i, j, |n| n.score))
         // Ignore possible errors and pull out the best scoring unit time
         .unwrap()
         .item;
+
+    bestunitmillis
 }
 
 fn char_to_morse(c: char) -> Morse {
