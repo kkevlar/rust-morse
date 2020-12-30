@@ -24,6 +24,27 @@ fn stutter_blink(led: &mut PB5<Output>, times: i16) {
     arduino_uno::delay_ms(1000);
 }
 
+use busted::morse_utils::*;
+
+fn helper_fill_events_slice<T>(durations: &[i64], vec: &mut Vec<TimedLightEvent, T>)
+where
+    T: heapless::ArrayLength<TimedLightEvent>,
+{
+    for (i, duration) in durations.iter().enumerate() {
+        vec.push(TimedLightEvent {
+            light_state: {
+                if i % 2 == 0 {
+                    LightState::Dark
+                } else {
+                    LightState::Dark
+                }
+            },
+            duration: *duration,
+        })
+        .unwrap();
+    }
+}
+
 #[arduino_uno::entry]
 fn main() -> ! {
     let peripherals = arduino_uno::Peripherals::take().unwrap();
@@ -32,7 +53,42 @@ fn main() -> ! {
 
     let mut led = pins.d13.into_output(&mut pins.ddr);
 
-    loop {
-        stutter_blink(&mut led, 5);
+    let test_durations = [
+        700, 300, 100, 100, 100, 100, 100, 100, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100,
+        100, 300, 300, 300, 300, 300, 300, 100, 300, 300, 300, 100, 100, 700, 300, 100, 300, 100,
+        300, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100, 100, 300, 100, 100, 700,
+    ];
+
+
+    let mut timed_light_events: Vec<TimedLightEvent, U128> = Vec::new();
+    helper_fill_events_slice(&test_durations, &mut timed_light_events);
+
+    let tle = TimedLightEvent{
+        light_state : LightState::Dark,
+        duration : 8,
+    };
+
+    let expected : Scored<i64> = Scored {
+        item: 100,
+        score: 0,
+    };
+    let myb =  expected == 
+    match estimate_unit_time(&timed_light_events)
+    {
+        Ok(d) => d,
+        _ => expected
+        
+    };
+    if timed_light_events[5] == tle || myb
+    {
+        loop {
+            stutter_blink(&mut led, 5);
+        }
+    } else {
+        loop {}
+    }
+    loop{
+
+
     }
 }

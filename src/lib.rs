@@ -1,4 +1,5 @@
 #![no_std]
+#![no_main]
 
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
@@ -17,37 +18,37 @@ enum Morse {
     LongSpace,
 }
 
-mod morse_utils {
+pub mod morse_utils {
 
+    extern crate heapless;
+extern crate panic_halt; // v0.4.x
 
-extern crate heapless;
-
-use heapless::consts::*;
-use heapless::FnvIndexMap;
-use heapless::Vec;
+    use heapless::consts::*;
+    use heapless::FnvIndexMap;
+    use heapless::Vec;
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-    enum LightState {
+    pub enum LightState {
         Light,
         Dark,
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-    struct Scored<T> {
-        item: T,
-        score: i64,
+    pub struct Scored<T> {
+        pub item: T,
+        pub score: i64,
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-    struct TimedLightEvent {
-        light_state: LightState,
-        duration: i64,
+    pub struct TimedLightEvent {
+        pub light_state: LightState,
+        pub duration: i64,
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
-    struct MorseCandidate {
-        light_state: LightState,
-        units: i64,
+    pub struct MorseCandidate {
+        pub light_state: LightState,
+        pub units: i64,
     }
 
     const MORSE_CANDIDATES: [MorseCandidate; 5] = [
@@ -103,7 +104,7 @@ use heapless::Vec;
         }
     }
 
-    fn best_error(
+    pub fn best_error(
         event: &TimedLightEvent,
         unit_millis: i64,
     ) -> Result<Scored<&MorseCandidate>, ()> {
@@ -127,7 +128,7 @@ use heapless::Vec;
             .ok_or(())
     }
 
-    fn estimate_unit_time(timings: &[TimedLightEvent]) -> Scored<i64> {
+    pub fn estimate_unit_time(timings: &[TimedLightEvent]) -> Result<Scored<i64>, ()> {
         // Iterate over possible unit times from 1 to 5000 ms
         (1..5000)
             // For each time, score it by summing the scores of the best candidate for each event
@@ -143,7 +144,7 @@ use heapless::Vec;
             // Converge on the minimum scoring unit time
             .fold(None, |i, j| rolling_min(i, j, |n| n.score))
             // Ignore possible errors and pull out the best scoring unit time
-            .unwrap()
+            .ok_or(())
     }
 
     #[cfg(test)]
