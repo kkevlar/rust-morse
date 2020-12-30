@@ -4,6 +4,7 @@
 #![no_main]
 
 extern crate heapless;
+extern crate morse_utils;
 extern crate panic_halt; // v0.4.x
 
 use arduino_uno::hal::port::mode::Output;
@@ -24,7 +25,7 @@ fn stutter_blink(led: &mut PB5<Output>, times: i16) {
     arduino_uno::delay_ms(1000);
 }
 
-use busted::morse_utils::*;
+use morse_utils::morse_utils::*;
 
 fn helper_fill_events_slice<T>(durations: &[i64], vec: &mut Vec<TimedLightEvent, T>)
 where
@@ -45,6 +46,21 @@ where
     }
 }
 
+fn best_error_helper(light_state: LightState, duration: i64, units: i64) -> i64 {
+       
+    match best_error(
+        &TimedLightEvent {
+            light_state,
+            duration,
+        },
+        units,
+    )
+    {
+       Ok(s) => s.score,
+       _ => 200000, 
+    }
+} 
+
 #[arduino_uno::entry]
 fn main() -> ! {
     let peripherals = arduino_uno::Peripherals::take().unwrap();
@@ -59,36 +75,37 @@ fn main() -> ! {
         300, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100, 100, 300, 100, 100, 700,
     ];
 
+    stutter_blink(&mut led, 1);
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 2);
 
     let mut timed_light_events: Vec<TimedLightEvent, U128> = Vec::new();
     helper_fill_events_slice(&test_durations, &mut timed_light_events);
 
-    let tle = TimedLightEvent{
-        light_state : LightState::Dark,
-        duration : 8,
-    };
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 3);
 
-    let expected : Scored<i64> = Scored {
+    let expected: Scored<i64> = Scored {
         item: 100,
         score: 0,
     };
-    let myb =  expected == 
-    match estimate_unit_time(&timed_light_events)
-    {
-        Ok(d) => d,
-        _ => expected
-        
-    };
-    if timed_light_events[5] == tle || myb
-    {
+    let myb = 
+         match estimate_unit_time(&timed_light_events[0..1]) {
+            Ok(actual) => expected == actual,
+            _ => false,
+        };
+
+    if myb {
         loop {
-            stutter_blink(&mut led, 5);
+            stutter_blink(&mut led, 4);
+    arduino_uno::delay_ms(1000);
         }
     } else {
-        loop {}
-    }
-    loop{
+        loop {
 
-
+            stutter_blink(&mut led, 1);
+    arduino_uno::delay_ms(1000);
+        }
     }
+    loop {}
 }

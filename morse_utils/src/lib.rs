@@ -1,5 +1,4 @@
 #![no_std]
-#![no_main]
 
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
@@ -21,7 +20,6 @@ enum Morse {
 pub mod morse_utils {
 
     extern crate heapless;
-extern crate panic_halt; // v0.4.x
 
     use heapless::consts::*;
     use heapless::FnvIndexMap;
@@ -74,7 +72,7 @@ extern crate panic_halt; // v0.4.x
         },
     ];
 
-    fn calc_error(
+    pub fn calc_error(
         event: &TimedLightEvent,
         candidate: &MorseCandidate,
         unit_millis: i64,
@@ -130,13 +128,13 @@ extern crate panic_halt; // v0.4.x
 
     pub fn estimate_unit_time(timings: &[TimedLightEvent]) -> Result<Scored<i64>, ()> {
         // Iterate over possible unit times from 1 to 5000 ms
-        (1..5000)
+        (99..101)
             // For each time, score it by summing the scores of the best candidate for each event
             .map(|unit_millis: i64| -> Scored<i64> {
                 Scored {
                     item: unit_millis,
                     score: timings
-                        .into_iter()
+                        .iter()
                         .map(|event| best_error(event, unit_millis).unwrap().score)
                         .sum(),
                 }
@@ -254,7 +252,7 @@ extern crate panic_halt; // v0.4.x
                     item: 100,
                     score: 0
                 },
-                estimate_unit_time(&timed_light_events)
+                estimate_unit_time(&timed_light_events).unwrap()
             );
         }
     }
@@ -279,4 +277,4 @@ extern crate panic_halt; // v0.4.x
 //     }
 // }
 
-// fn main() -> () {}
+fn main() -> () {}

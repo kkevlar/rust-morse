@@ -82,6 +82,7 @@ version = "0.1.0"
 dependencies = [
  "arduino-uno",
  "heapless",
+ "morse_utils",
  "panic-halt",
 ]
 
@@ -154,6 +155,14 @@ dependencies = [
  "generic-array 0.13.2",
  "hash32",
  "stable_deref_trait",
+]
+
+[[package]]
+name = "morse_utils"
+version = "0.1.0"
+dependencies = [
+ "heapless",
+ "panic-halt",
 ]
 
 [[package]]
