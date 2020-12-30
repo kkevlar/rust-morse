@@ -154,6 +154,38 @@ mod tests {
         assert_eq!(2, best_error_helper(Light, 1502, 500));
         assert_eq!(0, best_error_helper(Light, 75, 25));
     }
+
+    fn helper_fill_events_slice<T>(durations: &[i64], vec: &mut Vec<TimedLightEvent, T>) where 
+        T : heapless::ArrayLength<TimedLightEvent>
+        {
+
+        for (i, duration) in durations.iter().enumerate() {
+            vec.push(TimedLightEvent {
+                light_state: {
+                    if i % 2 == 0 {
+                        LightState::Dark
+                    } else {
+                        LightState::Dark
+                    }
+                },
+               duration: *duration,
+            }
+        ).unwrap();
+        }
+    }
+
+    #[test]
+    fn test_estimate() {
+        let test_durations = [
+            700, 300, 100, 100, 100, 100, 100, 100, 300, 300, 100, 300, 100, 300, 300, 100, 100,
+            100, 100, 300, 300, 300, 300, 300, 300, 100, 300, 300, 300, 100, 100, 700, 300, 100,
+            300, 100, 300, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100, 100, 300, 100, 100,
+            700,
+        ];
+        let mut timed_light_events : Vec<TimedLightEvent, U128> = Vec::new();
+        helper_fill_events_slice(&test_durations, & mut timed_light_events);
+        assert_eq!(Scored{item:100, score:0}, estimate_unit_time(&timed_light_events));
+    }
 }
 
 fn make_score(
@@ -195,9 +227,9 @@ fn best_error(event: &TimedLightEvent, unit_millis: i64) -> Result<Scored<&Morse
         .ok_or(())
 }
 
-fn estimate_unit_time(timings: &[TimedLightEvent]) -> i64 {
+fn estimate_unit_time(timings: &[TimedLightEvent]) -> Scored<i64> {
     // Iterate over possible unit times from 1 to 5000 ms
-    let bestunitmillis: i64 = (1..5000)
+    (1..5000)
         // For each time, score it by summing the scores of the best candidate for each event
         .map(|unit_millis: i64| -> Scored<i64> {
             Scored {
@@ -212,9 +244,6 @@ fn estimate_unit_time(timings: &[TimedLightEvent]) -> i64 {
         .fold(None, |i, j| rolling_min(i, j, |n| n.score))
         // Ignore possible errors and pull out the best scoring unit time
         .unwrap()
-        .item;
-
-    bestunitmillis
 }
 
 fn char_to_morse(c: char) -> Morse {
