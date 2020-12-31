@@ -90,7 +90,7 @@ fn main() -> ! {
         score: 0,
     };
     let myb = 
-         match estimate_unit_time(&timed_light_events[0..1]) {
+         match estimate_unit_time(&timed_light_events) {
             Ok(actual) => expected == actual,
             _ => false,
         };

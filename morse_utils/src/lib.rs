@@ -127,22 +127,23 @@ pub mod morse_utils {
     }
 
     pub fn estimate_unit_time(timings: &[TimedLightEvent]) -> Result<Scored<i64>, ()> {
+        let mut best : Option<Scored<i64>> = None;
         // Iterate over possible unit times from 1 to 5000 ms
-        (99..101)
+        for unit_millis in 99..102 {
             // For each time, score it by summing the scores of the best candidate for each event
-            .map(|unit_millis: i64| -> Scored<i64> {
-                Scored {
+            let mut sum = 0;
+            for te in timings {
+                sum += best_error(te, unit_millis)?.score;
+            }
+            best = match best {
+                Some(s) if s.score < sum => best,
+                _ => Some(Scored {
                     item: unit_millis,
-                    score: timings
-                        .iter()
-                        .map(|event| best_error(event, unit_millis).unwrap().score)
-                        .sum(),
-                }
-            })
-            // Converge on the minimum scoring unit time
-            .fold(None, |i, j| rolling_min(i, j, |n| n.score))
-            // Ignore possible errors and pull out the best scoring unit time
-            .ok_or(())
+                    score: sum,
+                }),
+            }
+        }
+        best.ok_or(())
     }
 
     #[cfg(test)]
