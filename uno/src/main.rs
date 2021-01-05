@@ -47,19 +47,17 @@ where
 }
 
 fn best_error_helper(light_state: LightState, duration: i64, units: i64) -> i64 {
-       
     match best_error(
         &TimedLightEvent {
             light_state,
             duration,
         },
         units,
-    )
-    {
-       Ok(s) => s.score,
-       _ => 200000, 
+    ) {
+        Ok(s) => s.score,
+        _ => 200000,
     }
-} 
+}
 
 #[arduino_uno::entry]
 fn main() -> ! {
@@ -89,23 +87,18 @@ fn main() -> ! {
         item: 100,
         score: 0,
     };
-    let myb = 
-         match estimate_unit_time(&timed_light_events) {
-            Ok(actual) => expected == actual,
-            _ => false,
-        };
-
-    if myb {
-        loop {
-            stutter_blink(&mut led, 4);
-    arduino_uno::delay_ms(1000);
-        }
-    } else {
-        loop {
-
+    match estimate_unit_time(&timed_light_events, 90, 110) {
+        Ok(actual) if expected == actual => loop {
+            stutter_blink(&mut led, 5);
+            arduino_uno::delay_ms(1000);
+        },
+        Err(_) => loop {
+            stutter_blink(&mut led, 3);
+            arduino_uno::delay_ms(1000);
+        },
+        _ => loop {
             stutter_blink(&mut led, 1);
-    arduino_uno::delay_ms(1000);
-        }
-    }
-    loop {}
+            arduino_uno::delay_ms(1000);
+        },
+    };
 }

@@ -1,5 +1,5 @@
 #![no_std]
-#![feature(bool_to_option)]
+
 
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
@@ -25,11 +25,17 @@ pub mod morse_utils {
     use heapless::consts::*;
     use heapless::FnvIndexMap;
     use heapless::Vec;
+use core::convert::TryFrom;
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     pub enum LightState {
         Light,
         Dark,
+    }
+
+    #[derive(PartialEq, Eq, Copy, Clone, Debug)]
+    pub enum MorseErr {
+        TooFewTLEs,
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -96,17 +102,21 @@ pub mod morse_utils {
         })
     }
 
-    fn rolling_min<T>(min_so_far: Option<T>, next: T, f: fn(&T) -> i64) -> Option<T> {
-        match min_so_far {
-            Some(m) if f(&m) < f(&next) => Some(m),
-            _ => Some(next),
+    fn poisoned_min<T>(min_so_far : Option<Result<T, MorseErr>>, next: Result<T, MorseErr>, f: fn(&T) -> i64) -> Option<Result<T, MorseErr>> {
+        Some(
+        match (min_so_far, next) {
+            (None, next) => next,
+            (Some(Err(prev_error)), _) => Err(prev_error),
+            (Some(Ok(_)), Err(next_error)) => Err(next_error),
+            (Some(Ok(msf)) , Ok(next)) => if f(&msf) < f(&next) {Ok(msf)} else {Ok(next)},
         }
+    )
     }
 
     pub fn best_error(
         event: &TimedLightEvent,
         unit_millis: i64,
-    ) -> Result<Scored<&MorseCandidate>, ()> {
+    ) -> Result<Scored<&MorseCandidate>, MorseErr> {
         // Turns all of the possible morse candidates into an iterator
         MORSE_CANDIDATES
             .iter()
@@ -120,41 +130,74 @@ pub mod morse_utils {
             // Unwraps each optional score, leaving only scores which weren't failures
             .filter_map(|opt| opt)
             // Starts with none, but folds and returns the highest scoring Scored struct
-            .fold(None, |i, j| {
-                rolling_min(i, j, |x: &Scored<&MorseCandidate>| x.score)
+            .fold(None, |i : Option<Result<Scored<&MorseCandidate>, MorseErr>>, j : Scored<&MorseCandidate>| {
+                poisoned_min(i, Ok(j), |x: &Scored<&MorseCandidate>| x.score)
             })
             // Returns the Err variant if the Scored struct was not present
-            .ok_or(())
+            .unwrap_or(Err(MorseErr::TooFewTLEs))
+    }
+
+    // pub fn estimate_unit_time(
+    //     timings: &[TimedLightEvent],
+    //     min_millis: i64,
+    //     max_millis: i64,
+    // ) -> Result<Scored<i64>, ()> {
+    //     let millis_iter = if max_millis > min_millis {
+    //         Ok(min_millis..max_millis)
+    //     } else {
+    //         Err(())
+    //     };
+
+    //     let mut best: Option<Scored<i64>> = None;
+    //     // Iterate over possible unit times from 1 to 5000 ms
+    //     for unit_millis in millis_iter? {
+    //         // For each time, score it by summing the scores of the best candidate for each event
+    //         let mut sum = 0;
+    //         for te in timings {
+    //             sum += best_error(te, unit_millis)?.score;
+    //         }
+    //         best = match best {
+    //             Some(s) if s.score < sum => best,
+    //             _ => Some(Scored {
+    //                 item: unit_millis,
+    //                 score: sum,
+    //             }),
+    //         }
+    //     }
+    //     best.ok_or(())
+    // }
+
+    pub fn score_possible_unit_millis(
+        unit_millis: i64,
+        timings: &[TimedLightEvent],
+    ) -> Result<Scored<i64>, MorseErr> {
+        let best_errors = timings
+            .iter()
+            .map(|event| -> Result<i64, _> { Ok(best_error(event, unit_millis)?.score) });
+        let mut sum = 0;
+        for e in best_errors {
+            sum += e?;
+        }
+        Ok(Scored{ score : sum, item: unit_millis})
     }
 
     pub fn estimate_unit_time(
         timings: &[TimedLightEvent],
         min_millis: i64,
         max_millis: i64,
-    ) -> Result<Scored<i64>, ()> {
-        let millis_iter = if max_millis > min_millis {
-            Ok(min_millis..max_millis)
-        } else {
-            Err(())
-        };
-
-        let mut best: Option<Scored<i64>> = None;
+    ) -> Result<Scored<i64>, MorseErr> {
         // Iterate over possible unit times from 1 to 5000 ms
-        for unit_millis in millis_iter? {
+        (min_millis..max_millis)
             // For each time, score it by summing the scores of the best candidate for each event
-            let mut sum = 0;
-            for te in timings {
-                sum += best_error(te, unit_millis)?.score;
-            }
-            best = match best {
-                Some(s) if s.score < sum => best,
-                _ => Some(Scored {
-                    item: unit_millis,
-                    score: sum,
-                }),
-            }
-        }
-        best.ok_or(())
+            .map(|unit_millis| {
+                score_possible_unit_millis(unit_millis, timings) 
+            })
+            // Converge on the minimum scoring unit time
+            .fold(None, |i , j| 
+                poisoned_min(i, j, 
+                |n| n.score))
+            // Ignore possible errors and pull out the best scoring unit time
+            .unwrap_or(Err(MorseErr::TooFewTLEs))
     }
 
     fn fill_unit_time_possibilities() {
@@ -270,7 +313,7 @@ pub mod morse_utils {
                     item: 100,
                     score: 0
                 },
-                estimate_unit_time(&timed_light_events).unwrap()
+                estimate_unit_time(&timed_light_events, 0, 10000).unwrap()
             );
         }
     }
