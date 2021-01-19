@@ -1,5 +1,17 @@
 #![no_std]
 
+#[derive(Debug)]
+struct TooFewElementsError {
+    message: &'static str,
+}
+
+impl core::fmt::Display for TooFewElementsError {
+    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::result::Result<(), core::fmt::Error> {
+        write!(fmt, "{}", self.message)
+    }
+}
+
+// impl Error for TooFewElementsError {}
 
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
@@ -22,10 +34,10 @@ pub mod morse_utils {
 
     extern crate heapless;
 
+    use core::convert::TryFrom;
     use heapless::consts::*;
     use heapless::FnvIndexMap;
     use heapless::Vec;
-use core::convert::TryFrom;
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     pub enum LightState {
@@ -36,6 +48,7 @@ use core::convert::TryFrom;
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     pub enum MorseErr {
         TooFewTLEs,
+        TooManyUnitMillisGuessesToTry,
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -102,16 +115,24 @@ use core::convert::TryFrom;
         })
     }
 
-    fn poisoned_min<T>(min_so_far : Option<Result<T, MorseErr>>, next: Result<T, MorseErr>, f: fn(&T) -> i64) -> Option<Result<T, MorseErr>> {
-        Some(
-        match (min_so_far, next) {
-            (None, next) => next,
-            (Some(Err(prev_error)), _) => Err(prev_error),
-            (Some(Ok(_)), Err(next_error)) => Err(next_error),
-            (Some(Ok(msf)) , Ok(next)) => if f(&msf) < f(&next) {Ok(msf)} else {Ok(next)},
-        }
-    )
-    }
+    // fn poisoned_min<T>(
+    //     min_so_far: Option<Result<T, MorseErr>>,
+    //     next: Result<T, MorseErr>,
+    //     f: fn(&T) -> i64,
+    // ) -> Option<Result<T, MorseErr>> {
+    //     Some(match (min_so_far, next) {
+    //         (None, next) => next,
+    //         (Some(Err(prev_error)), _) => Err(prev_error),
+    //         (Some(Ok(_)), Err(next_error)) => Err(next_error),
+    //         (Some(Ok(msf)), Ok(next)) => {
+    //             if f(&msf) < f(&next) {
+    //                 Ok(msf)
+    //             } else {
+    //                 Ok(next)
+    //             }
+    //         }
+    //     })
+    // }
 
     pub fn best_error(
         event: &TimedLightEvent,
@@ -128,13 +149,9 @@ use core::convert::TryFrom;
                 })
             })
             // Unwraps each optional score, leaving only scores which weren't failures
-            .filter_map(|opt| opt)
-            // Starts with none, but folds and returns the highest scoring Scored struct
-            .fold(None, |i : Option<Result<Scored<&MorseCandidate>, MorseErr>>, j : Scored<&MorseCandidate>| {
-                poisoned_min(i, Ok(j), |x: &Scored<&MorseCandidate>| x.score)
-            })
-            // Returns the Err variant if the Scored struct was not present
-            .unwrap_or(Err(MorseErr::TooFewTLEs))
+            .filter_map(|s| s)
+            .min_by_key(|s| s.score)
+            .ok_or(MorseErr::TooFewTLEs)
     }
 
     // pub fn estimate_unit_time(
@@ -171,14 +188,14 @@ use core::convert::TryFrom;
         unit_millis: i64,
         timings: &[TimedLightEvent],
     ) -> Result<Scored<i64>, MorseErr> {
-        let best_errors = timings
+        let score: i64 = timings
             .iter()
-            .map(|event| -> Result<i64, _> { Ok(best_error(event, unit_millis)?.score) });
-        let mut sum = 0;
-        for e in best_errors {
-            sum += e?;
-        }
-        Ok(Scored{ score : sum, item: unit_millis})
+            .map(|event| -> Result<i64, MorseErr> { Ok(best_error(event, unit_millis)?.score) })
+            .fold(Ok(0), |l, r| Ok(l? + r?))?;
+        Ok(Scored {
+            item: unit_millis,
+            score,
+        })
     }
 
     pub fn estimate_unit_time(
@@ -186,18 +203,24 @@ use core::convert::TryFrom;
         min_millis: i64,
         max_millis: i64,
     ) -> Result<Scored<i64>, MorseErr> {
-        // Iterate over possible unit times from 1 to 5000 ms
-        (min_millis..max_millis)
+        let iter = if max_millis - min_millis > 256 {
+            Err(MorseErr::TooManyUnitMillisGuessesToTry)
+        } else {
+            Ok(min_millis..max_millis)
+        };
+
+        let v: Result<Vec<Scored<i64>, U256>, MorseErr> = iter?
+            .into_iter()
+            // Iterate over possible unit times from 1 to 5000 ms
             // For each time, score it by summing the scores of the best candidate for each event
-            .map(|unit_millis| {
-                score_possible_unit_millis(unit_millis, timings) 
-            })
-            // Converge on the minimum scoring unit time
-            .fold(None, |i , j| 
-                poisoned_min(i, j, 
-                |n| n.score))
+            .map(|unit_millis| score_possible_unit_millis(unit_millis, timings))
+            .collect();
+
+        // Converge on the minimum scoring unit time
+        v?.into_iter()
+            .max_by_key(|s| s.score)
             // Ignore possible errors and pull out the best scoring unit time
-            .unwrap_or(Err(MorseErr::TooFewTLEs))
+            .ok_or(MorseErr::TooFewTLEs)
     }
 
     fn fill_unit_time_possibilities() {
