@@ -115,24 +115,23 @@ pub mod morse_utils {
         })
     }
 
-    // fn poisoned_min<T>(
-    //     min_so_far: Option<Result<T, MorseErr>>,
-    //     next: Result<T, MorseErr>,
-    //     f: fn(&T) -> i64,
-    // ) -> Option<Result<T, MorseErr>> {
-    //     Some(match (min_so_far, next) {
-    //         (None, next) => next,
-    //         (Some(Err(prev_error)), _) => Err(prev_error),
-    //         (Some(Ok(_)), Err(next_error)) => Err(next_error),
-    //         (Some(Ok(msf)), Ok(next)) => {
-    //             if f(&msf) < f(&next) {
-    //                 Ok(msf)
-    //             } else {
-    //                 Ok(next)
-    //             }
-    //         }
-    //     })
-    // }
+    fn poisoned_min<T>(
+        min_so_far: Option<Result<Scored<T>, MorseErr>>,
+        next: Result<Scored<T>, MorseErr>,
+    ) -> Option<Result<Scored<T>, MorseErr>> {
+        Some(match (min_so_far, next) {
+            (None, next) => next,
+            (Some(Err(prev_error)), _) => Err(prev_error),
+            (Some(Ok(_)), Err(next_error)) => Err(next_error),
+            (Some(Ok(msf)), Ok(next)) => {
+                if msf.score < next.score {
+                    Ok(msf)
+                } else {
+                    Ok(next)
+                }
+            }
+        })
+    }
 
     pub fn best_error(
         event: &TimedLightEvent,
@@ -203,24 +202,16 @@ pub mod morse_utils {
         min_millis: i64,
         max_millis: i64,
     ) -> Result<Scored<i64>, MorseErr> {
-        let iter = if max_millis - min_millis > 256 {
-            Err(MorseErr::TooManyUnitMillisGuessesToTry)
-        } else {
-            Ok(min_millis..max_millis)
-        };
-
-        let v: Result<Vec<Scored<i64>, U256>, MorseErr> = iter?
-            .into_iter()
-            // Iterate over possible unit times from 1 to 5000 ms
+        // Iterate over possible unit times from 1 to 5000 ms
+        (min_millis..max_millis)
             // For each time, score it by summing the scores of the best candidate for each event
-            .map(|unit_millis| score_possible_unit_millis(unit_millis, timings))
-            .collect();
-
-        // Converge on the minimum scoring unit time
-        v?.into_iter()
-            .max_by_key(|s| s.score)
+            .map(|unit_millis| {
+                score_possible_unit_millis(unit_millis, timings) 
+            })
+            // Converge on the minimum scoring unit time
+            .fold(None, poisoned_min)
             // Ignore possible errors and pull out the best scoring unit time
-            .ok_or(MorseErr::TooFewTLEs)
+            .unwrap_or(Err(MorseErr::TooFewTLEs))
     }
 
     fn fill_unit_time_possibilities() {
