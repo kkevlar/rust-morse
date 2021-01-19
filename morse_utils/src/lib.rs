@@ -177,6 +177,33 @@ pub mod morse_utils {
         }
     }
 
+    type Time = i64;
+    type LightIntensity = u16;
+
+
+    fn oofus(intensities: &[(Time,LightIntensity)]) -> (u64, u64)
+    {
+        let intensity_sum : u64 = intensities.iter().map(|(_,li)| *li as u64).sum();
+        let intensity_avg : u64 = intensity_sum / (intensities.len() as u64);
+
+        let lows = intensities.iter().filter(|(_, li)| (*li as u64) < intensity_avg);
+        let highs = intensities.iter().filter(|(_, li)| (*li as u64) >= intensity_avg);
+
+        let mut count : u64 = 0;
+        let lows_sum : u64 = lows.map(|(_,li)| {count+=1;   *li as u64 }).sum();
+        let lows_avg = lows_sum / count;
+
+        let mut count : u64 = 0;
+        let highs_sum : u64 = highs.map(|(_,li)| {count+=1;   *li as u64 }).sum();
+        let highs_avg = highs_sum / count;
+        
+        let diff = highs_avg - lows_avg;
+        let lowcut = lows_avg + (diff / 4);
+        let high_cut = lows_avg + ((3 * diff) / 4);
+
+        (lowcut, high_cut)
+    }
+
     #[cfg(test)]
     mod tests {
         use super::*;
