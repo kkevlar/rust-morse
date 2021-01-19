@@ -1,17 +1,5 @@
 #![no_std]
 
-#[derive(Debug)]
-struct TooFewElementsError {
-    message: &'static str,
-}
-
-impl core::fmt::Display for TooFewElementsError {
-    fn fmt(&self, fmt: &mut core::fmt::Formatter) -> core::result::Result<(), core::fmt::Error> {
-        write!(fmt, "{}", self.message)
-    }
-}
-
-// impl Error for TooFewElementsError {}
 
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
@@ -48,7 +36,6 @@ pub mod morse_utils {
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     pub enum MorseErr {
         TooFewTLEs,
-        TooManyUnitMillisGuessesToTry,
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
@@ -152,36 +139,6 @@ pub mod morse_utils {
             .min_by_key(|s| s.score)
             .ok_or(MorseErr::TooFewTLEs)
     }
-
-    // pub fn estimate_unit_time(
-    //     timings: &[TimedLightEvent],
-    //     min_millis: i64,
-    //     max_millis: i64,
-    // ) -> Result<Scored<i64>, ()> {
-    //     let millis_iter = if max_millis > min_millis {
-    //         Ok(min_millis..max_millis)
-    //     } else {
-    //         Err(())
-    //     };
-
-    //     let mut best: Option<Scored<i64>> = None;
-    //     // Iterate over possible unit times from 1 to 5000 ms
-    //     for unit_millis in millis_iter? {
-    //         // For each time, score it by summing the scores of the best candidate for each event
-    //         let mut sum = 0;
-    //         for te in timings {
-    //             sum += best_error(te, unit_millis)?.score;
-    //         }
-    //         best = match best {
-    //             Some(s) if s.score < sum => best,
-    //             _ => Some(Scored {
-    //                 item: unit_millis,
-    //                 score: sum,
-    //             }),
-    //         }
-    //     }
-    //     best.ok_or(())
-    // }
 
     pub fn score_possible_unit_millis(
         unit_millis: i64,
