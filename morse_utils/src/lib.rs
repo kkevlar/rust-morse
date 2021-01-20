@@ -1,6 +1,5 @@
 #![no_std]
 
-
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
          let mut map = heapless::FnvIndexMap::new();
@@ -27,6 +26,9 @@ pub mod morse_utils {
     use heapless::FnvIndexMap;
     use heapless::Vec;
 
+    type Time = i64;
+    type LightIntensity = u16;
+
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     pub enum LightState {
         Light,
@@ -47,13 +49,13 @@ pub mod morse_utils {
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     pub struct TimedLightEvent {
         pub light_state: LightState,
-        pub duration: i64,
+        pub duration: Time,
     }
 
     #[derive(PartialEq, Eq, Copy, Clone, Debug)]
     pub struct MorseCandidate {
         pub light_state: LightState,
-        pub units: i64,
+        pub units: Time,
     }
 
     const MORSE_CANDIDATES: [MorseCandidate; 5] = [
@@ -82,7 +84,7 @@ pub mod morse_utils {
     pub fn calc_error(
         event: &TimedLightEvent,
         candidate: &MorseCandidate,
-        unit_millis: i64,
+        unit_millis: Time,
     ) -> Option<i64> {
         if event.light_state == candidate.light_state {
             Some((event.duration - candidate.units * unit_millis).abs())
@@ -94,7 +96,7 @@ pub mod morse_utils {
     fn make_score(
         event: &TimedLightEvent,
         mc: &'static MorseCandidate,
-        unit_millis: i64,
+        unit_millis: Time,
     ) -> Option<Scored<&'static MorseCandidate>> {
         Some(Scored {
             item: mc,
@@ -122,7 +124,7 @@ pub mod morse_utils {
 
     pub fn best_error(
         event: &TimedLightEvent,
-        unit_millis: i64,
+        unit_millis: Time,
     ) -> Result<Scored<&MorseCandidate>, MorseErr> {
         // Turns all of the possible morse candidates into an iterator
         MORSE_CANDIDATES
@@ -141,12 +143,12 @@ pub mod morse_utils {
     }
 
     pub fn score_possible_unit_millis(
-        unit_millis: i64,
+        unit_millis: Time,
         timings: &[TimedLightEvent],
-    ) -> Result<Scored<i64>, MorseErr> {
-        let score: i64 = timings
+    ) -> Result<Scored<Time>, MorseErr> {
+        let score: Time = timings
             .iter()
-            .map(|event| -> Result<i64, MorseErr> { Ok(best_error(event, unit_millis)?.score) })
+            .map(|event| -> Result<Time, MorseErr> { Ok(best_error(event, unit_millis)?.score) })
             .fold(Ok(0), |l, r| Ok(l? + r?))?;
         Ok(Scored {
             item: unit_millis,
@@ -156,15 +158,13 @@ pub mod morse_utils {
 
     pub fn estimate_unit_time(
         timings: &[TimedLightEvent],
-        min_millis: i64,
-        max_millis: i64,
-    ) -> Result<Scored<i64>, MorseErr> {
+        min_millis: Time,
+        max_millis: Time,
+    ) -> Result<Scored<Time>, MorseErr> {
         // Iterate over possible unit times from 1 to 5000 ms
         (min_millis..max_millis)
             // For each time, score it by summing the scores of the best candidate for each event
-            .map(|unit_millis| {
-                score_possible_unit_millis(unit_millis, timings) 
-            })
+            .map(|unit_millis| score_possible_unit_millis(unit_millis, timings))
             // Converge on the minimum scoring unit time
             .fold(None, poisoned_min)
             // Ignore possible errors and pull out the best scoring unit time
@@ -177,31 +177,82 @@ pub mod morse_utils {
         }
     }
 
-    type Time = i64;
-    type LightIntensity = u16;
+    fn oofus(
+        intensities: &[(Time, LightIntensity)],
+    ) -> Result<(LightIntensity, LightIntensity), core::num::TryFromIntError> {
+        let intensity_sum: u64 = intensities.iter().map(|(_, li)| *li as u64).sum();
+        let intensity_avg: u64 = intensity_sum / (intensities.len() as u64);
 
+        let lows = intensities
+            .iter()
+            .filter(|(_, li)| (*li as u64) < intensity_avg);
+        let highs = intensities
+            .iter()
+            .filter(|(_, li)| (*li as u64) >= intensity_avg);
 
-    fn oofus(intensities: &[(Time,LightIntensity)]) -> (u64, u64)
-    {
-        let intensity_sum : u64 = intensities.iter().map(|(_,li)| *li as u64).sum();
-        let intensity_avg : u64 = intensity_sum / (intensities.len() as u64);
-
-        let lows = intensities.iter().filter(|(_, li)| (*li as u64) < intensity_avg);
-        let highs = intensities.iter().filter(|(_, li)| (*li as u64) >= intensity_avg);
-
-        let mut count : u64 = 0;
-        let lows_sum : u64 = lows.map(|(_,li)| {count+=1;   *li as u64 }).sum();
+        let mut count: u64 = 0;
+        let lows_sum: u64 = lows
+            .map(|(_, li)| {
+                count += 1;
+                *li as u64
+            })
+            .sum();
         let lows_avg = lows_sum / count;
 
-        let mut count : u64 = 0;
-        let highs_sum : u64 = highs.map(|(_,li)| {count+=1;   *li as u64 }).sum();
+        let mut count: u64 = 0;
+        let highs_sum: u64 = highs
+            .map(|(_, li)| {
+                count += 1;
+                *li as u64
+            })
+            .sum();
         let highs_avg = highs_sum / count;
-        
+
         let diff = highs_avg - lows_avg;
-        let lowcut = lows_avg + (diff / 4);
+        let low_cut = lows_avg + (diff / 4);
         let high_cut = lows_avg + ((3 * diff) / 4);
 
-        (lowcut, high_cut)
+        Ok((
+            LightIntensity::try_from(low_cut)?,
+            LightIntensity::try_from(high_cut)?,
+        ))
+    }
+
+    fn convert<C>(
+        intensities: &[(Time, LightIntensity)],
+        light_states: &mut Vec<TimedLightEvent, C>,
+        start_time: Time,
+    ) -> Result<(), core::num::TryFromIntError>
+    where
+        C: heapless::ArrayLength<TimedLightEvent>,
+    {
+        use LightState::*;
+        let mut curr_light_state = Dark;
+        let mut start_time = start_time;
+
+        let (low_cut, high_cut) = oofus(intensities)?;
+
+        for (time, light) in intensities.iter() {
+            let next_light_state = match (curr_light_state, light) {
+                (Dark, x) if *x > high_cut => Some(Dark),
+                (Light, x) if *x < low_cut => Some(Light),
+                _ => None,
+            };
+            match next_light_state {
+                Some(next_light_state) => {
+                    let tle = TimedLightEvent {
+                        light_state: curr_light_state,
+                        duration: *time - start_time,
+                    };
+
+                    light_states.push(tle);
+                    curr_light_state = next_light_state;
+                    start_time = *time;
+                }
+                _ => (),
+            };
+        };
+        Ok(())
     }
 
     #[cfg(test)]
