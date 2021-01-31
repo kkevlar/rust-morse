@@ -12,9 +12,10 @@ macro_rules! hashmap {
 pub enum Morse {
     Dot,
     Dash,
-    Space,
     Error,
-    LongSpace,
+    TinySpace,
+    LetterSpace,
+    WordSpace,
 }
 
 extern crate heapless;
@@ -388,15 +389,15 @@ pub fn mc_to_morse(mc: &MorseCandidate) -> Morse {
         MorseCandidate {
             light_state: LightState::Dark,
             units: 1,
-        } => Space,
+        } => TinySpace,
         MorseCandidate {
             light_state: LightState::Dark,
             units: 3,
-        } => Morse::LongSpace,
+        } => LetterSpace,
         MorseCandidate {
             light_state: LightState::Dark,
             units: 7,
-        } => Morse::Error,
+        } => WordSpace,
         _ => Morse::Error,
     }
 }
