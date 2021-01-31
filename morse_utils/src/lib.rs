@@ -1,4 +1,4 @@
-// #![no_std]
+#![no_std]
 
 macro_rules! hashmap {
     ($( $key: expr => $val: expr ),*) => {{
