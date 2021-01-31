@@ -11,10 +11,10 @@ use arduino_uno::hal::port::mode::Output;
 use arduino_uno::hal::port::portb::PB5;
 use arduino_uno::prelude::*;
 
+use core::convert::TryFrom;
 use heapless::consts::*;
 use heapless::FnvIndexMap;
 use heapless::Vec;
-use core::convert::TryFrom;
 
 fn stutter_blink(led: &mut PB5<Output>, times: i16) {
     for i in 0..times {
@@ -68,7 +68,7 @@ macro_rules! hashmap {
     }}
 }
 
-fn split_slice<'a, T>(sl: &'a [T], on: &T) -> Vec<Vec<&'a T, U32>,U32>
+fn split_slice<'a, T>(sl: &'a [T], on: &T) -> Vec<Vec<&'a T, U32>, U32>
 where
     T: core::fmt::Debug + core::cmp::PartialEq,
 {
@@ -97,39 +97,71 @@ fn main() -> ! {
     let mut led = pins.d13.into_output(&mut pins.ddr);
 
     let intensities = [
-        (4480, 14),
-        (4500, 51),
-        (4520, 57),
-        (4540, 58),
-        (4560, 59),
-        (9760, 59),
-        (9770, 59),
-        (9780, 59),
+        (5, 50),
+        (10, 50),
+        (15, 500),
+        (20, 50),
+        (25, 500),
+        (30, 50),
+        (35, 500),
+        (40, 50),
+        (60, 51),
     ];
 
-    stutter_blink(&mut led, 2);
+    stutter_blink(&mut led, 1);
     arduino_uno::delay_ms(1000);
     stutter_blink(&mut led, 2);
 
     let mut timed_light_events: Vec<_, U512> = Vec::new();
-    convert(&intensities[..], &mut timed_light_events, 0).unwrap();
+    match convert(&intensities[..], &mut timed_light_events, 0)
+    {
+        Err(_) => loop{
 
-  let unit = estimate_unit_time(&timed_light_events, 0, 1000)
-        .unwrap()
-        .item;
+    arduino_uno::delay_ms(500);
+    stutter_blink(&mut led, 4);
+    arduino_uno::delay_ms(500);
+    stutter_blink(&mut led, 1);
+         },
+        _ => (),
+    };
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 3);
+
+
+    let r = estimate_unit_time(&timed_light_events, 0, 1000);
+    match r
+    {
+        Err(_) => loop{
+
+    arduino_uno::delay_ms(500);
+    stutter_blink(&mut led, 3);
+    arduino_uno::delay_ms(500);
+    stutter_blink(&mut led, 2);
+         },
+        _ => (),
+    }
+
+    let unit = r.unwrap() .item;
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 1);
 
     let r: Vec<Scored<&MorseCandidate>, U256> = timed_light_events
         .iter()
         .map(|tle| morse_utils::best_error(tle, unit))
         .filter_map(Result::ok)
-        .collect();   
+        .collect();
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 2);
 
-  let r: Vec<morse_utils::Morse, U256> = r
+    let r: Vec<morse_utils::Morse, U256> = r
         .into_iter()
         .map(|s| morse_utils::mc_to_morse(s.item))
         .collect();
 
-  let morse_key: FnvIndexMap<&str, char, U64> = hashmap![
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 3);
+
+    let morse_key: FnvIndexMap<&str, char, U64> = hashmap![
     "01" => 'a',
     "1000" => 'b',
     "1010" => 'c',
@@ -158,13 +190,16 @@ fn main() -> ! {
     "1100" => 'z'
     ];
 
-  let v: Vec<Vec<char,U32>, U32> = split_slice(&r, &Morse::WordSpace)
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 1);
+
+    let v: Vec<Vec<char, U32>, U32> = split_slice(&r, &Morse::WordSpace)
         .iter()
         .map(|v| {
             split_slice(v, &&Morse::LetterSpace)
                 .into_iter()
                 .map(|v| {
-                    let my_vec: Vec<char,U128> = v
+                    let my_vec: Vec<char, U128> = v
                         .into_iter()
                         .map(|m| {
                             use morse_utils::Morse::*;
@@ -177,9 +212,8 @@ fn main() -> ! {
                         })
                         .filter_map(|x| x)
                         .collect();
-                    let mut my_string : heapless::String<U128> = heapless::String::new();
-                    for m in my_vec.iter()
-                    {
+                    let mut my_string: heapless::String<U128> = heapless::String::new();
+                    for m in my_vec.iter() {
                         my_string.push(*m);
                     }
                     let k = my_string.as_str();
@@ -189,10 +223,10 @@ fn main() -> ! {
         })
         .collect();
 
-        loop {
-    stutter_blink(&mut led, i16::try_from(v.len()).unwrap() + 1);
-    arduino_uno::delay_ms(1000);
-        }
+    loop {
+        stutter_blink(&mut led, i16::try_from(v.len()).unwrap() + 1);
+        arduino_uno::delay_ms(1000);
+    }
 
     // stutter_blink(&mut led, 2);
 
