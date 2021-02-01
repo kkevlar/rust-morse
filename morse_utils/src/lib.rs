@@ -164,20 +164,21 @@ pub fn estimate_unit_time(
     max_millis: Time,
 ) -> Result<Scored<Time>, MorseErr> {
     // Iterate over possible unit times from 1 to 5000 ms
-    (min_millis..max_millis)
-        // For each time, score it by summing the scores of the best candidate for each event
-        .map(|ratio| {
-            // let ratio = ratio as f32;
-            // let ratio = ratio / 100f32;
-            // let plus = (max_millis - min_millis) as f32 * ratio;
-            // let plus = plus as Time;
-            // score_possible_unit_millis(min_millis + plus, timings)
-            score_possible_unit_millis(ratio, timings)
-        })
-        // Converge on the minimum scoring unit time
-        .fold(None, poisoned_min)
-        // Ignore possible errors and pull out the best scoring unit time
-        .unwrap_or(Err(MorseErr::TooFewTLEs))
+            score_possible_unit_millis(min_millis, timings)
+    // (min_millis..max_millis)
+    //     // For each time, score it by summing the scores of the best candidate for each event
+    //     .map(|ratio| {
+    //         // let ratio = ratio as f32;
+    //         // let ratio = ratio / 100f32;
+    //         // let plus = (max_millis - min_millis) as f32 * ratio;
+    //         // let plus = plus as Time;
+    //         // score_possible_unit_millis(min_millis + plus, timings)
+    //         score_possible_unit_millis(ratio, timings)
+    //     })
+    //     // Converge on the minimum scoring unit time
+    //     .fold(None, poisoned_min)
+    //     // Ignore possible errors and pull out the best scoring unit time
+    //     .unwrap_or(Err(MorseErr::TooFewTLEs))
 }
 
 fn fill_unit_time_possibilities() {
