@@ -16,7 +16,7 @@ use heapless::FnvIndexMap;
 use heapless::Vec;
 
 fn stutter_blink(led: &mut PB5<Output>, times: i16) {
-    for i in 0..times {
+    for _i in 0..times {
         led.toggle().void_unwrap();
         arduino_uno::delay_ms(100);
         led.toggle().void_unwrap();
@@ -89,7 +89,7 @@ fn main() -> ! {
     };
     match estimate_unit_time(&timed_light_events, 90, 110) {
         Ok(actual) if expected == actual => loop {
-            stutter_blink(&mut led, 5);
+            stutter_blink(&mut led, 7);
             arduino_uno::delay_ms(1000);
         },
         Err(_) => loop {
