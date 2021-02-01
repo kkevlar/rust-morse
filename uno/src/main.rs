@@ -134,48 +134,48 @@ fn main() -> ! {
         },
     };
 
-    stutter_blink(&mut led, 2);
-    arduino_uno::delay_ms(1000);
+    // stutter_blink(&mut led, 2);
+    // arduino_uno::delay_ms(1000);
 
-    let intensities = [
-        (5, 50),
-        (10, 50),
-        (15, 500),
-        (20, 50),
-        (25, 500),
-        (30, 50),
-        (35, 500),
-        (40, 50),
-        (60, 51),
-    ];
+    // let intensities = [
+    //     (5, 50),
+    //     (10, 50),
+    //     (15, 500),
+    //     (20, 50),
+    //     (25, 500),
+    //     (30, 50),
+    //     (35, 500),
+    //     (40, 50),
+    //     (60, 51),
+    // ];
 
-    stutter_blink(&mut led, 1);
-    arduino_uno::delay_ms(1000);
-    stutter_blink(&mut led, 2);
+    // stutter_blink(&mut led, 1);
+    // arduino_uno::delay_ms(1000);
+    // stutter_blink(&mut led, 2);
 
-    let mut timed_light_events: Vec<_, U32> = Vec::new();
-    match convert(&intensities[..], &mut timed_light_events, 0) {
-        Err(_) => loop {
-            arduino_uno::delay_ms(500);
-            stutter_blink(&mut led, 4);
-            arduino_uno::delay_ms(500);
-            stutter_blink(&mut led, 1);
-        },
-        _ => (),
-    };
-    arduino_uno::delay_ms(1000);
-    stutter_blink(&mut led, 3);
+    // let mut timed_light_events: Vec<_, U32> = Vec::new();
+    // match convert(&intensities[..], &mut timed_light_events, 0) {
+    //     Err(_) => loop {
+    //         arduino_uno::delay_ms(500);
+    //         stutter_blink(&mut led, 4);
+    //         arduino_uno::delay_ms(500);
+    //         stutter_blink(&mut led, 1);
+    //     },
+    //     _ => (),
+    // };
+    // arduino_uno::delay_ms(1000);
+    // stutter_blink(&mut led, 3);
 
-    let r = estimate_unit_time(&timed_light_events, 5, 6);
-    match r {
-        Err(_) => loop {
-            arduino_uno::delay_ms(1000);
-            stutter_blink(&mut led, 4);
-            arduino_uno::delay_ms(500);
-            stutter_blink(&mut led, 1);
-        },
-        _ => (),
-    }
+    // let r = estimate_unit_time(&timed_light_events, 5, 6);
+    // match r {
+    //     Err(_) => loop {
+    //         arduino_uno::delay_ms(1000);
+    //         stutter_blink(&mut led, 4);
+    //         arduino_uno::delay_ms(500);
+    //         stutter_blink(&mut led, 1);
+    //     },
+    //     _ => (),
+    // }
 
     // let unit = r.unwrap().item;
     // arduino_uno::delay_ms(1000);
@@ -291,7 +291,7 @@ fn main() -> ! {
     //     },
     // };
     loop {
-            stutter_blink(&mut led, 7);
+            stutter_blink(&mut led, 10);
             arduino_uno::delay_ms(1000);
     }
 }
