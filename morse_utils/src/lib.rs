@@ -125,36 +125,44 @@ pub fn best_error(
     event: &TimedLightEvent,
     unit_millis: Time,
 ) -> Result<Scored<&MorseCandidate>, MorseErr> {
-    // Turns all of the possible morse candidates into an iterator
-    MORSE_CANDIDATES
-        .iter()
-        // Scores each possible morse candidate using calc_error
-        .map(|mc| {
-            Some(Scored {
-                item: mc,
-                score: calc_error(event, mc, unit_millis)?,
-            })
-        })
-        // Unwraps each optional score, leaving only scores which weren't failures
-        .filter_map(|s| s)
-        .min_by_key(|s| s.score)
-        .ok_or(MorseErr::TooFewTLEs)
+    let mut best = None;
+    for mc in MORSE_CANDIDATES.iter() {
+        match (calc_error(event, mc, unit_millis), best) {
+            (None, _) => continue,
+            (Some(curr), None) => {
+                best = Some(Scored {
+                    item: mc,
+                    score: curr,
+                })
+            }
+            (Some(curr), Some(Scored { score: b, .. })) if curr < b => {
+                best = Some(Scored {
+                    item: mc,
+                    score: curr,
+                })
+            }
+            _ => (),
+        };
+    }
+    best.ok_or(MorseErr::TooFewTLEs)
 }
 
 pub fn score_possible_unit_millis(
     unit_millis: Time,
     timings: &[TimedLightEvent],
 ) -> Result<Scored<Time>, MorseErr> {
-    let score: Time = timings
-        .iter()
-        .map(|event| -> Result<Time, MorseErr> { Ok(best_error(event, unit_millis)?.score) })
-        .fold(Ok(0), |l, r| Ok(l? + r?))?;
+    let mut sum = 0;
+
+    for event in timings {
+        let score = best_error(event, unit_millis)?.score;
+        sum += score;
+    }
+
     let result = Ok(Scored {
         item: unit_millis,
-        score,
+        score: sum,
     });
 
-    // println!("Trying {:?}", result );
     result
 }
 
@@ -164,7 +172,7 @@ pub fn estimate_unit_time(
     max_millis: Time,
 ) -> Result<Scored<Time>, MorseErr> {
     // Iterate over possible unit times from 1 to 5000 ms
-            score_possible_unit_millis(min_millis, timings)
+    score_possible_unit_millis(min_millis, timings)
     // (min_millis..max_millis)
     //     // For each time, score it by summing the scores of the best candidate for each event
     //     .map(|ratio| {

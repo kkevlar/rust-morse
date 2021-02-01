@@ -96,6 +96,47 @@ fn main() -> ! {
 
     let mut led = pins.d13.into_output(&mut pins.ddr);
 
+  let test_durations = [
+        700, 300, 100, 100, 100, 100, 100, 100, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100,
+        100, 300, 300, 300, 300, 300, 300, 100, 300, 300, 300, 100, 100, 700, 300, 100, 300, 100,
+        300, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100, 100, 300, 100, 100, 700,
+    ];
+
+    stutter_blink(&mut led, 1);
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 1);
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 1);
+    arduino_uno::delay_ms(1000);
+
+    let mut timed_light_events: Vec<TimedLightEvent, U128> = Vec::new();
+    helper_fill_events_slice(&test_durations, &mut timed_light_events);
+
+    stutter_blink(&mut led, 1);
+
+    let expected: Scored<i64> = Scored {
+        item: 100,
+        score: 0,
+    };
+    match estimate_unit_time(&timed_light_events, 100, 110) {
+        Ok(actual) if expected == actual => {
+            stutter_blink(&mut led, 7);
+            arduino_uno::delay_ms(1000);
+        },
+        Err(_) => loop {
+            stutter_blink(&mut led, 3);
+            arduino_uno::delay_ms(1000);
+        },
+        _ => 
+        loop {
+            stutter_blink(&mut led, 3);
+            arduino_uno::delay_ms(1000);
+        },
+    };
+
+    stutter_blink(&mut led, 2);
+    arduino_uno::delay_ms(1000);
+
     let intensities = [
         (5, 50),
         (10, 50),
@@ -128,10 +169,10 @@ fn main() -> ! {
     let r = estimate_unit_time(&timed_light_events, 5, 6);
     match r {
         Err(_) => loop {
+            arduino_uno::delay_ms(1000);
+            stutter_blink(&mut led, 4);
             arduino_uno::delay_ms(500);
-            stutter_blink(&mut led, 3);
-            arduino_uno::delay_ms(500);
-            stutter_blink(&mut led, 2);
+            stutter_blink(&mut led, 1);
         },
         _ => (),
     }

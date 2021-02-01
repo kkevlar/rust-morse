@@ -33,7 +33,6 @@ where
     v
 }
 
-
 fn main() -> () {
     use morse_utils::*;
 
@@ -52,16 +51,14 @@ fn main() -> () {
 
     let mut timed_light_events: Vec<_, U128> = Vec::new();
     match convert(&intensities[..], &mut timed_light_events, 0) {
-        Err(_) => loop {
-        },
+        Err(_) => loop {},
         _ => (),
     };
     println!("{:?}", timed_light_events);
 
     let r = estimate_unit_time(&timed_light_events, 5, 6);
     match r {
-        Err(_) => loop {
-        },
+        Err(_) => loop {},
         _ => (),
     }
     println!("{:?}", r);
