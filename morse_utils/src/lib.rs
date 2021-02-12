@@ -172,21 +172,20 @@ pub fn estimate_unit_time(
     max_millis: Time,
 ) -> Result<Scored<Time>, MorseErr> {
     // Iterate over possible unit times from 1 to 5000 ms
-    score_possible_unit_millis(min_millis, timings)
-    // (min_millis..max_millis)
-    //     // For each time, score it by summing the scores of the best candidate for each event
-    //     .map(|ratio| {
-    //         // let ratio = ratio as f32;
-    //         // let ratio = ratio / 100f32;
-    //         // let plus = (max_millis - min_millis) as f32 * ratio;
-    //         // let plus = plus as Time;
-    //         // score_possible_unit_millis(min_millis + plus, timings)
-    //         score_possible_unit_millis(ratio, timings)
-    //     })
-    //     // Converge on the minimum scoring unit time
-    //     .fold(None, poisoned_min)
-    //     // Ignore possible errors and pull out the best scoring unit time
-    //     .unwrap_or(Err(MorseErr::TooFewTLEs))
+    (min_millis..max_millis)
+        // For each time, score it by summing the scores of the best candidate for each event
+        .map(|ratio| {
+            // let ratio = ratio as f32;
+            // let ratio = ratio / 100f32;
+            // let plus = (max_millis - min_millis) as f32 * ratio;
+            // let plus = plus as Time;
+            // score_possible_unit_millis(min_millis + plus, timings)
+            score_possible_unit_millis(ratio, timings)
+        })
+        // Converge on the minimum scoring unit time
+        .fold(None, poisoned_min)
+        // Ignore possible errors and pull out the best scoring unit time
+        .unwrap_or(Err(MorseErr::TooFewTLEs))
 }
 
 fn fill_unit_time_possibilities() {
@@ -198,41 +197,41 @@ fn fill_unit_time_possibilities() {
 pub fn calc_digital_cutoffs(
     intensities: &[(Time, LightIntensity)],
 ) -> Result<(LightIntensity, LightIntensity), core::num::TryFromIntError> {
-    let intensity_sum: u64 = intensities.iter().map(|(_, li)| *li as u64).sum();
-    let intensity_avg: u64 = intensity_sum / (intensities.len() as u64);
+    let mut intensity_sum: u32 = 0; 
 
-    let lows = intensities
-        .iter()
-        .filter(|(_, li)| (*li as u64) < intensity_avg);
-    let highs = intensities
-        .iter()
-        .filter(|(_, li)| (*li as u64) >= intensity_avg);
+    for (_, li) in intensities
+    {
+        intensity_sum += *li as u32;
+    }
 
-    let mut count: u64 = 0;
-    let lows_sum: u64 = lows
-        .map(|(_, li)| {
-            count += 1;
-            *li as u64
-        })
-        .sum();
-    let lows_avg = lows_sum / count;
+    let intensity_avg: u32 = intensity_sum / (intensities.len() as u32);
 
-    let mut count: u64 = 0;
-    let highs_sum: u64 = highs
-        .map(|(_, li)| {
-            count += 1;
-            *li as u64
-        })
-        .sum();
-    let highs_avg = highs_sum / count;
+        let mut lows = (0u32, 0u32);
+        let mut highs = (0u32, 0u32);
+    for (_ , li) in intensities
+    {
+        let li = *li as u32;
+        if li > intensity_avg
+        {
+           highs = (highs.0+1, highs.1 +li);
+        }
+        else 
+        {
+           lows = (lows.0+1, lows.1 +li);
+        }
+
+    }
+
+    let lows_avg = lows.1 / lows.0;
+    let highs_avg = highs.1 / highs.0;
 
     let diff = highs_avg - lows_avg;
     let low_cut = lows_avg + (diff / 4);
     let high_cut = lows_avg + ((3 * diff) / 4);
 
     Ok((
-        LightIntensity::try_from(low_cut)?,
-        LightIntensity::try_from(high_cut)?,
+        low_cut as u16,
+        high_cut as u16,
     ))
 }
 

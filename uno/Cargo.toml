@@ -6,7 +6,7 @@ edition = "2018"
 
 [dependencies]
 panic-halt = "0.2.0"
-heapless = "0.5.6"
+heapless = "0.6.0"
 
 [dependencies.morse_utils]
 path = "../morse_utils"

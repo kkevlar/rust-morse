@@ -19,9 +19,9 @@ use heapless::Vec;
 fn stutter_blink(led: &mut PB5<Output>, times: i16) {
     for i in 0..times {
         led.toggle().void_unwrap();
-        arduino_uno::delay_ms(100);
+        arduino_uno::delay_ms(150);
         led.toggle().void_unwrap();
-        arduino_uno::delay_ms(100);
+        arduino_uno::delay_ms(150);
     }
     arduino_uno::delay_ms(1000);
 }
@@ -88,6 +88,27 @@ where
     v
 }
 
+ const myint: [(Time, LightIntensity); 9] = [
+        (5, 50),
+        (10, 50),
+        (15, 500),
+        (20, 50),
+        (25, 500),
+        (30, 50),
+        (35, 500),
+        (40, 50),
+        (60, 51),
+    ];
+
+
+const test_durations : [i64; 52] = [
+        700, 300, 100, 100, 100, 100, 100, 100, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100,
+        100, 300, 300, 300, 300, 300, 300, 100, 300, 300, 300, 100, 100, 700, 300, 100, 300, 100,
+        300, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100, 100, 300, 100, 100, 700,
+    ];
+
+
+
 #[arduino_uno::entry]
 fn main() -> ! {
     let peripherals = arduino_uno::Peripherals::take().unwrap();
@@ -96,23 +117,17 @@ fn main() -> ! {
 
     let mut led = pins.d13.into_output(&mut pins.ddr);
 
-  let test_durations = [
-        700, 300, 100, 100, 100, 100, 100, 100, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100,
-        100, 300, 300, 300, 300, 300, 300, 100, 300, 300, 300, 100, 100, 700, 300, 100, 300, 100,
-        300, 300, 300, 100, 300, 100, 300, 300, 100, 100, 100, 100, 300, 100, 100, 700,
-    ];
+    // stutter_blink(&mut led, 1);
+    // arduino_uno::delay_ms(1000);
+    // stutter_blink(&mut led, 1);
+    // arduino_uno::delay_ms(1000);
+    // stutter_blink(&mut led, 1);
+    // arduino_uno::delay_ms(1000);
 
-    stutter_blink(&mut led, 1);
-    arduino_uno::delay_ms(1000);
-    stutter_blink(&mut led, 1);
-    arduino_uno::delay_ms(1000);
-    stutter_blink(&mut led, 1);
-    arduino_uno::delay_ms(1000);
-
-    let mut timed_light_events: Vec<TimedLightEvent, U128> = Vec::new();
+    let mut timed_light_events: Vec<TimedLightEvent, U64> = Vec::new();
     helper_fill_events_slice(&test_durations, &mut timed_light_events);
 
-    stutter_blink(&mut led, 1);
+    // stutter_blink(&mut led, 1);
 
     let expected: Scored<i64> = Scored {
         item: 100,
@@ -120,11 +135,9 @@ fn main() -> ! {
     };
     match estimate_unit_time(&timed_light_events, 100, 110) {
         Ok(actual) if expected == actual => {
-            stutter_blink(&mut led, 7);
-            arduino_uno::delay_ms(1000);
         },
         Err(_) => loop {
-            stutter_blink(&mut led, 3);
+            stutter_blink(&mut led, 5);
             arduino_uno::delay_ms(1000);
         },
         _ => 
@@ -134,27 +147,15 @@ fn main() -> ! {
         },
     };
 
-    // stutter_blink(&mut led, 2);
+    // stutter_blink(&mut led, 1);
     // arduino_uno::delay_ms(1000);
-
-    // let intensities = [
-    //     (5, 50),
-    //     (10, 50),
-    //     (15, 500),
-    //     (20, 50),
-    //     (25, 500),
-    //     (30, 50),
-    //     (35, 500),
-    //     (40, 50),
-    //     (60, 51),
-    // ];
 
     // stutter_blink(&mut led, 1);
     // arduino_uno::delay_ms(1000);
     // stutter_blink(&mut led, 2);
 
-    // let mut timed_light_events: Vec<_, U32> = Vec::new();
-    // match convert(&intensities[..], &mut timed_light_events, 0) {
+    // let mut ttt: Vec<TimedLightEvent, U32> = Vec::new();
+    // match convert(&myint[0..], &mut ttt, 0) {
     //     Err(_) => loop {
     //         arduino_uno::delay_ms(500);
     //         stutter_blink(&mut led, 4);
@@ -164,9 +165,10 @@ fn main() -> ! {
     //     _ => (),
     // };
     // arduino_uno::delay_ms(1000);
-    // stutter_blink(&mut led, 3);
+    // stutter_blink(&mut led, 1);
 
-    // let r = estimate_unit_time(&timed_light_events, 5, 6);
+    // let r = estimate_unit_time(&ttt, 5, 6);
+    // let mut unwr;
     // match r {
     //     Err(_) => loop {
     //         arduino_uno::delay_ms(1000);
@@ -174,20 +176,29 @@ fn main() -> ! {
     //         arduino_uno::delay_ms(500);
     //         stutter_blink(&mut led, 1);
     //     },
-    //     _ => (),
+    //     Ok(r) => unwr = r.item,
     // }
 
-    // let unit = r.unwrap().item;
+    // // let unit = r.unwrap().item;
     // arduino_uno::delay_ms(1000);
     // stutter_blink(&mut led, 1);
 
-    // let r: Vec<Scored<&MorseCandidate>, U256> = timed_light_events
-    //     .iter()
-    //     .map(|tle| morse_utils::best_error(tle, unit))
-    //     .filter_map(Result::ok)
-    //     .collect();
-    // arduino_uno::delay_ms(1000);
-    // stutter_blink(&mut led, 2);
+
+    let mut r: Vec<Scored<&MorseCandidate>, U64> = Vec::new();
+     timed_light_events
+        .iter()
+        .map(|tle| 
+            {
+                led.toggle().unwrap();
+    arduino_uno::delay_ms(200);
+                 morse_utils::best_error(tle, 100) }
+        )
+        .filter_map(Result::ok)
+        .for_each(|f| 
+            { r.push(f);() }
+        );
+    arduino_uno::delay_ms(1000);
+    stutter_blink(&mut led, 2);
 
     // let r: Vec<morse_utils::Morse, U256> = r
     //     .into_iter()
@@ -291,7 +302,7 @@ fn main() -> ! {
     //     },
     // };
     loop {
-            stutter_blink(&mut led, 10);
+            stutter_blink(&mut led, 9);
             arduino_uno::delay_ms(1000);
     }
 }
